@@ -134,4 +134,4 @@ A special thanks to Amy Nelson, the PC Client Workgroup Chair, for being our poi
 [spec-public-review]: https://trustedcomputinggroup.org/specifications-public-review/
 [saml-sig-wrapping]: https://www.usenix.org/system/files/conference/usenixsecurity12/sec12-final91-8-23-12.pdf
 [jwt-header-none]: https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/
-[go-attestation]: https://github.com/google/go-attestation
+[go-attestation]: https://github.com/smallstep/go-attestation

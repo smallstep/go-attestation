@@ -24,7 +24,7 @@ import (
 	"strings"
 	"unicode/utf16"
 
-	"github.com/google/go-attestation/attest/internal"
+	"github.com/smallstep/go-attestation/attest/internal"
 )
 
 type windowsEvent uint32

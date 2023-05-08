@@ -8,7 +8,7 @@ If your system has git and a [Go 1.15+ compiler](https://golang.org/dl/) install
 install `attest-tool` from source by running the following commands:
 
 ```shell
-git clone 'https://github.com/google/go-attestation' && cd go-attestation/attest/attest-tool
+git clone 'https://github.com/smallstep/go-attestation' && cd go-attestation/attest/attest-tool
 go build -o attest-tool ./ # compiled to ./attest-tool
 ```
 

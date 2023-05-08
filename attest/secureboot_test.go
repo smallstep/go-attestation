@@ -50,7 +50,7 @@ func TestSecureBoot(t *testing.T) {
 	}
 }
 
-// See: https://github.com/google/go-attestation/issues/157
+// See: https://github.com/smallstep/go-attestation/issues/157
 func TestSecureBootBug157(t *testing.T) {
 	raw, err := os.ReadFile("testdata/sb_cert_eventlog")
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 	"io"
 	"unicode/utf16"
 
-	"github.com/google/go-attestation/attest"
+	"github.com/smallstep/go-attestation/attest"
 )
 
 var (

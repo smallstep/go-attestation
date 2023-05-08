@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/go-attestation/attest/internal"
+	"github.com/smallstep/go-attestation/attest/internal"
 )
 
 // SecurebootState describes the secure boot status of a machine, as determined
@@ -192,7 +192,7 @@ func ParseSecurebootState(events []Event) (*SecurebootState, error) {
 
 				a, err := internal.ParseUEFIVariableAuthority(v)
 				if err != nil {
-					// Workaround for: https://github.com/google/go-attestation/issues/157
+					// Workaround for: https://github.com/smallstep/go-attestation/issues/157
 					if err == internal.ErrSigMissingGUID {
 						// Versions of shim which do not carry
 						// https://github.com/rhboot/shim/commit/8a27a4809a6a2b40fb6a4049071bf96d6ad71b50

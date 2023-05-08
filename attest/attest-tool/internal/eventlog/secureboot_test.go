@@ -19,8 +19,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/google/go-attestation/attest"
-	"github.com/google/go-attestation/attest/attest-tool/internal"
+	"github.com/smallstep/go-attestation/attest"
+	"github.com/smallstep/go-attestation/attest/attest-tool/internal"
 )
 
 func parseEvents(t *testing.T, testdata string) []attest.Event {

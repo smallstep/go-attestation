@@ -113,7 +113,7 @@ func (e EventType) String() string {
 // state of a machine[1]. In general it's much safer to only rely on the raw PCR
 // values and use the event log for debugging.
 //
-// [1] https://github.com/google/go-attestation/blob/master/docs/event-log-disclosure.md
+// [1] https://github.com/smallstep/go-attestation/blob/master/docs/event-log-disclosure.md
 type Event struct {
 	// order of the event in the event log.
 	sequence int

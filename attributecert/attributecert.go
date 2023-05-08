@@ -17,7 +17,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/google/go-attestation/oid"
+	"github.com/smallstep/go-attestation/oid"
 )
 
 var (

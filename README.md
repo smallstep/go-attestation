@@ -1,7 +1,7 @@
 Go-Attestation
 ==============
 
-[![GoDoc](https://godoc.org/github.com/google/go-attestation/attest?status.svg)](https://godoc.org/github.com/google/go-attestation/attest)
+[![GoDoc](https://godoc.org/github.com/smallstep/go-attestation/attest?status.svg)](https://godoc.org/github.com/smallstep/go-attestation/attest)
 
 Go-Attestation abstracts remote attestation operations across a variety of platforms
 and TPMs, enabling remote validation of machine identity and state. This project
@@ -25,7 +25,7 @@ testing is not covered by CI.
 
 ## Installation
 
-The go-attestation package is installable using go get: `go get github.com/google/go-attestation/attest`
+The go-attestation package is installable using go get: `go get github.com/smallstep/go-attestation/attest`
 
 ### TPM1.2
 By default, go-attestation does not build in TPM1.2 support on Linux.
