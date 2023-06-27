@@ -29,8 +29,8 @@ import (
 	"io"
 	"math/big"
 
+	"github.com/google/go-tpm/legacy/tpm2"
 	tpm1 "github.com/google/go-tpm/tpm"
-	"github.com/google/go-tpm/tpm2"
 	tpmtbs "github.com/google/go-tpm/tpmutil/tbs"
 	"golang.org/x/sys/windows"
 )
@@ -151,6 +151,18 @@ func (t *windowsTPM) info() (*TPMInfo, error) {
 	}
 
 	return &tInfo, nil
+}
+
+func (t *windowsTPM) ekCertificates() ([]EK, error) {
+	ekCerts, err := t.pcp.EKCerts()
+	if err != nil {
+		return nil, fmt.Errorf("could not read EKCerts: %v", err)
+	}
+	var eks []EK
+	for _, cert := range ekCerts {
+		eks = append(eks, EK{Certificate: cert, Public: cert.PublicKey})
+	}
+	return eks, nil
 }
 
 func (t *windowsTPM) eks() ([]EK, error) {
@@ -531,17 +543,12 @@ func getKeyName(config *KeyConfig) (string, error) {
 		return config.Name, nil
 	}
 
-	prefix := "app"
-	if config.Prefix != "" {
-		prefix = config.Prefix
-	}
-
 	nameHex := make([]byte, 5)
 	if n, err := rand.Read(nameHex); err != nil || n != len(nameHex) {
 		return "", fmt.Errorf("rand.Read() failed with %d/%d bytes read and error: %v", n, len(nameHex), err)
 	}
 
-	return fmt.Sprintf("%s-%x", prefix, nameHex), nil
+	return fmt.Sprintf("app-%x", nameHex), nil
 }
 
 func getAKName(config *AKConfig) (string, error) {
@@ -549,15 +556,10 @@ func getAKName(config *AKConfig) (string, error) {
 		return config.Name, nil
 	}
 
-	prefix := "ak"
-	if config.Prefix != "" {
-		prefix = config.Prefix
-	}
-
 	nameHex := make([]byte, 5)
 	if n, err := rand.Read(nameHex); err != nil || n != len(nameHex) {
 		return "", fmt.Errorf("rand.Read() failed with %d/%d bytes read and error: %v", n, len(nameHex), err)
 	}
 
-	return fmt.Sprintf("%s-%x", prefix, nameHex), nil
+	return fmt.Sprintf("ak-%x", nameHex), nil
 }
