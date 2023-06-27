@@ -105,7 +105,8 @@ type ak interface {
 	activateCredential(tpm tpmBase, in EncryptedCredential, ek *EK) ([]byte, error)
 	quote(t tpmBase, nonce []byte, alg HashAlg, selectedPCRs []int) (*Quote, error)
 	attestationParameters() AttestationParameters
-	certify(tb tpmBase, handle interface{}) (*CertificationParameters, error)
+	certify(tb tpmBase, handle interface{}, qualifyingData []byte) (*CertificationParameters, error)
+	blobs() ([]byte, []byte, error)
 }
 
 // AK represents a key which can be used for attestation.
@@ -166,11 +167,20 @@ func (k *AK) AttestationParameters() AttestationParameters {
 // key. Depending on the actual instantiation it can accept different handle
 // types (e.g., tpmutil.Handle on Linux or uintptr on Windows).
 func (k *AK) Certify(tpm *TPM, handle interface{}) (*CertificationParameters, error) {
-	return k.ak.certify(tpm.tpm, handle)
+	return k.ak.certify(tpm.tpm, handle, nil)
+}
+
+// Blobs returns public and private blobs to be used by tpm2.Load().
+func (k *AK) Blobs() (pub, priv []byte, err error) {
+	return k.ak.blobs()
 }
 
 // AKConfig encapsulates parameters for minting keys.
 type AKConfig struct {
+	// Name is used to specify a name for the key, instead of generating
+	// a random one. This property is only used on Windows.
+	Name string
+
 	// The EK that will be used for attestation.
 	// If nil, an RSA EK with handle 0x81010001 will be used.
 	// If not nil, it must be one of EKs returned from TPM.EKs().

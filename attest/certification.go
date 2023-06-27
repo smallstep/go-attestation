@@ -238,7 +238,7 @@ func (p *CertificationParameters) Generate(rnd io.Reader, verifyOpts VerifyOpts,
 
 // certify uses AK's handle and the passed signature scheme to certify the key
 // with the `hnd` handle.
-func certify(tpm io.ReadWriteCloser, hnd, akHnd tpmutil.Handle, scheme tpm2.SigScheme) (*CertificationParameters, error) {
+func certify(tpm io.ReadWriteCloser, hnd, akHnd tpmutil.Handle, qualifyingData []byte, scheme tpm2.SigScheme) (*CertificationParameters, error) {
 	pub, _, _, err := tpm2.ReadPublic(tpm, hnd)
 	if err != nil {
 		return nil, fmt.Errorf("tpm2.ReadPublic() failed: %v", err)
@@ -247,7 +247,7 @@ func certify(tpm io.ReadWriteCloser, hnd, akHnd tpmutil.Handle, scheme tpm2.SigS
 	if err != nil {
 		return nil, fmt.Errorf("could not encode public key: %v", err)
 	}
-	att, sig, err := tpm2.CertifyEx(tpm, "", "", hnd, akHnd, nil, scheme)
+	att, sig, err := tpm2.CertifyEx(tpm, "", "", hnd, akHnd, qualifyingData, scheme)
 	if err != nil {
 		return nil, fmt.Errorf("tpm2.Certify() failed: %v", err)
 	}

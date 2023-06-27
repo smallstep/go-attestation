@@ -72,6 +72,13 @@ type KeyConfig struct {
 	// Size is used to specify the bit size of the key or elliptic curve. For
 	// example, '256' is used to specify curve P-256.
 	Size int
+	// QualifyingData is data provided from outside to the TPM when an attestation
+	// operation is performed. The TPM doesn't interpret the data, but does sign over
+	// it. It can be used as a nonce to ensure freshness of an attestation.
+	QualifyingData []byte
+	// Name is used to specify a name for the key, instead of generating
+	// a random one. This property is only used on Windows.
+	Name string
 }
 
 // defaultConfig is used when no other configuration is specified.

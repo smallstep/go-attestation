@@ -116,6 +116,10 @@ func (t *trousersTPM) loadKey(opaqueBlob []byte) (*Key, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (t *trousersTPM) deleteKey(opaqueBlob []byte) error {
+	return fmt.Errorf("not implemented")
+}
+
 func (t *trousersTPM) newAK(opts *AKConfig) (*AK, error) {
 	pub, blob, err := attestation.CreateAIK(t.ctx)
 	if err != nil {
@@ -134,6 +138,10 @@ func (t *trousersTPM) loadAK(opaqueBlob []byte) (*AK, error) {
 	}
 
 	return &AK{ak: newTrousersKey12(sKey.Blob, sKey.Public)}, nil
+}
+
+func (t *trousersTPM) deleteAK(opaqueBlob []byte) error {
+	return fmt.Errorf("not implemented")
 }
 
 // allPCRs12 returns a map of all the PCR values on the TPM
