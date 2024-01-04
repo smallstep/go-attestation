@@ -215,8 +215,9 @@ func (k *windowsAK20) certify(tb tpmBase, handle interface{}, qualifyingData []b
 		return nil, fmt.Errorf("TPMCommandInterface() failed: %v", err)
 	}
 	scheme := tpm2.SigScheme{
-		Alg:  tpm2.AlgRSASSA,
-		Hash: tpm2.AlgSHA1, // PCP-created AK uses SHA1
+		Alg: tpm2.AlgRSASSA,
+		// PCP-created AK uses SHA1 but step-ca only verifies with SHA256
+		Hash: tpm2.AlgSHA256,
 	}
 	return certify(tpm, hnd, akHnd, qualifyingData, scheme)
 }
