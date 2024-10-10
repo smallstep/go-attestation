@@ -561,14 +561,47 @@ func (k *wrappedKey20) sign(tb tpmBase, digest []byte, pub crypto.PublicKey, opt
 	}
 	switch p := pub.(type) {
 	case *ecdsa.PublicKey:
-		return signECDSA(t.rwc, k.hnd, digest, p.Curve)
+		return signECDSA(t.rwc, k.hnd, digest, p.Curve, opts)
 	case *rsa.PublicKey:
 		return signRSA(t.rwc, k.hnd, digest, opts)
 	}
 	return nil, fmt.Errorf("unsupported signing key type: %T", pub)
 }
 
-func signECDSA(rw io.ReadWriter, key tpmutil.Handle, digest []byte, curve elliptic.Curve) ([]byte, error) {
+func signECDSA(rw io.ReadWriter, key tpmutil.Handle, digest []byte, curve elliptic.Curve, opts crypto.SignerOpts) ([]byte, error) {
+	var scheme *tpm2.SigScheme
+	if runtime.GOOS == "windows" {
+		// On Windows, if no scheme is specified, error code 0x12
+		// "unsupported or incompatible scheme" will be returned.
+		// By selecting an appropriate signature scheme this is prevented.
+		// TODO(hs): specify algorithm explicitly on Linux too?
+		// TODO(hs): determine if basing this off of the curve is OK; it's
+		// possible the TPM in fact doesn't support the hash algorithm.
+		h := tpm2.AlgSHA256
+		switch curve {
+		case elliptic.P384():
+			h = tpm2.AlgSHA384
+		case elliptic.P521():
+			h = tpm2.AlgSHA512
+		}
+		scheme = &tpm2.SigScheme{
+			Alg:  tpm2.AlgECDSA,
+			Hash: h,
+		}
+	}
+
+	// if opts is provided, it can override the hash function to use.
+	if opts != nil {
+		h, err := tpm2.HashToAlgorithm(opts.HashFunc())
+		if err != nil {
+			return nil, fmt.Errorf("incorrect hash algorithm: %v", err)
+		}
+		scheme = &tpm2.SigScheme{
+			Alg:  tpm2.AlgECDSA,
+			Hash: h,
+		}
+	}
+
 	// https://cs.opensource.google/go/go/+/refs/tags/go1.19.2:src/crypto/ecdsa/ecdsa.go;l=181
 	orderBits := curve.Params().N.BitLen()
 	orderBytes := (orderBits + 7) / 8
@@ -581,28 +614,6 @@ func signECDSA(rw io.ReadWriter, key tpmutil.Handle, digest []byte, curve ellipt
 		ret.Rsh(ret, uint(excess))
 	}
 	digest = ret.Bytes()
-
-	var scheme *tpm2.SigScheme
-	if runtime.GOOS == "windows" {
-		// On Windows, if no scheme is specified, error code 0x12
-		// "unsupported or incompatible scheme" will be returned.
-		// By selecting an appropriate signature scheme this is prevented.
-		// TODO(hs): specify algorithm explicitly on Linux too?
-		// TODO(hs): determine if basing this off of the curve is OK; it's
-		// possible the TPM in fact doesn't support the hash algorithm.
-		hash := tpm2.AlgSHA256
-		switch curve {
-		case elliptic.P384():
-			hash = tpm2.AlgSHA384
-		case elliptic.P521():
-			hash = tpm2.AlgSHA512
-		}
-
-		scheme = &tpm2.SigScheme{
-			Alg:  tpm2.AlgECDSA,
-			Hash: hash,
-		}
-	}
 
 	sig, err := tpm2.Sign(rw, key, "", digest, nil, scheme)
 	if err != nil {
