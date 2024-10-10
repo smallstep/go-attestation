@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"runtime"
 
 	"github.com/google/go-tpm/legacy/tpm2"
 	"github.com/google/go-tpm/tpmutil"
@@ -581,7 +582,29 @@ func signECDSA(rw io.ReadWriter, key tpmutil.Handle, digest []byte, curve ellipt
 	}
 	digest = ret.Bytes()
 
-	sig, err := tpm2.Sign(rw, key, "", digest, nil, nil)
+	var scheme *tpm2.SigScheme
+	if runtime.GOOS == "windows" {
+		// On Windows, if no scheme is specified, error code 0x12
+		// "unsupported or incompatible scheme" will be returned.
+		// By selecting an appropriate signature scheme this is prevented.
+		// TODO(hs): specify algorithm explicitly on Linux too?
+		// TODO(hs): determine if basing this off of the curve is OK; it's
+		// possible the TPM in fact doesn't support the hash algorithm.
+		hash := tpm2.AlgSHA256
+		switch curve {
+		case elliptic.P384():
+			hash = tpm2.AlgSHA384
+		case elliptic.P521():
+			hash = tpm2.AlgSHA512
+		}
+
+		scheme = &tpm2.SigScheme{
+			Alg:  tpm2.AlgECDSA,
+			Hash: hash,
+		}
+	}
+
+	sig, err := tpm2.Sign(rw, key, "", digest, nil, scheme)
 	if err != nil {
 		return nil, fmt.Errorf("cannot sign: %v", err)
 	}
