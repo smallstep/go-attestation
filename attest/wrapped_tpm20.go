@@ -592,10 +592,26 @@ func signECDSA(rw io.ReadWriter, key tpmutil.Handle, digest []byte, curve ellipt
 
 	// if opts is provided, it can override the hash function to use.
 	if opts != nil {
-		h, err := tpm2.HashToAlgorithm(opts.HashFunc())
-		if err != nil {
-			return nil, fmt.Errorf("incorrect hash algorithm: %v", err)
+		var (
+			h   tpm2.Algorithm
+			err error
+		)
+		if v := opts.HashFunc(); v != 0 {
+			h, err = tpm2.HashToAlgorithm(v)
+			if err != nil {
+				return nil, fmt.Errorf("incorrect hash algorithm: %v", err)
+			}
+		} else {
+			switch curve {
+			case elliptic.P384():
+				h = tpm2.AlgSHA384
+			case elliptic.P521():
+				h = tpm2.AlgSHA512
+			default:
+				h = tpm2.AlgSHA256
+			}
 		}
+
 		scheme = &tpm2.SigScheme{
 			Alg:  tpm2.AlgECDSA,
 			Hash: h,
