@@ -17,6 +17,8 @@ package attest
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
@@ -191,6 +193,23 @@ func (p *CertificationParameters) Verify(opts VerifyOpts) error {
 	return nil
 }
 
+func symBlockSizeForEK(ek crypto.PublicKey) int {
+	// see TCG EK Credential Profile Version 2.6, December 4, 2024, B.4.4 Storage EK Template
+	symBlockSize := defaultSymBlockSize // default to 16 bytes; 128 bits
+	switch pk := ek.(type) {
+	case *rsa.PublicKey:
+		if pk.Size() >= 384 { // RSA 3072, RSA 4096
+			symBlockSize = 32 // 32 bytes; 256 bits
+		}
+	case *ecdsa.PublicKey:
+		if pk.Curve == elliptic.P384() || pk.Curve == elliptic.P521() {
+			symBlockSize = 32 // 32 bytes; 256 bits
+		}
+	}
+
+	return symBlockSize
+}
+
 // Generate returns a credential activation challenge, which can be provided
 // to the TPM to verify the AK parameters given are authentic & the AK
 // is present on the same TPM as the EK.
@@ -225,7 +244,7 @@ func (p *CertificationParameters) Generate(rnd io.Reader, verifyOpts VerifyOpts,
 		return nil, nil, fmt.Errorf("attestation does not apply to certify data, got %x", att.Type)
 	}
 
-	cred, encSecret, err := credactivation.Generate(activateOpts.VerifierKeyNameDigest, activateOpts.EK, symBlockSize, secret)
+	cred, encSecret, err := credactivation.Generate(activateOpts.VerifierKeyNameDigest, activateOpts.EK, symBlockSizeForEK(activateOpts.EK), secret)
 	if err != nil {
 		return nil, nil, fmt.Errorf("credactivation.Generate() failed: %v", err)
 	}
