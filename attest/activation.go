@@ -23,9 +23,9 @@ const (
 	// activationSecretLen is the size in bytes of the generated secret
 	// which is generated for credential activation.
 	activationSecretLen = 32
-	// symBlockSize is the block size used for symmetric ciphers used
-	// when generating the credential activation challenge.
-	symBlockSize = 16
+	// defaultSymBlockSize is the block size used for symmetric ciphers
+	// used when generating the credential activation challenge.
+	defaultSymBlockSize = 16
 	// tpm20GeneratedMagic is a magic tag when can only be present on a
 	// TPM structure if the structure was generated wholly by the TPM.
 	tpm20GeneratedMagic = 0xff544347
@@ -239,7 +239,8 @@ func (p *ActivationParameters) generateChallengeTPM20(secret []byte) (*Encrypted
 	if att.AttestedCreationInfo.Name.Digest == nil {
 		return nil, fmt.Errorf("attestation creation info name has no digest")
 	}
-	cred, encSecret, err := credactivation.Generate(att.AttestedCreationInfo.Name.Digest, p.EK, symBlockSize, secret)
+
+	cred, encSecret, err := credactivation.Generate(att.AttestedCreationInfo.Name.Digest, p.EK, symBlockSizeForEK(p.EK), secret)
 	if err != nil {
 		return nil, fmt.Errorf("credactivation.Generate() failed: %v", err)
 	}

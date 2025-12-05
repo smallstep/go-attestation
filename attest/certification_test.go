@@ -22,6 +22,8 @@ package attest
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"testing"
@@ -396,4 +398,92 @@ func TestKeyActivationTPM20(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_symBlockSizeForEK(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rsa-2048", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 16 {
+			t.Errorf("unexpected symBlockSize %d; expected 16", symBlockSize)
+		}
+	})
+
+	t.Run("rsa-3072", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := rsa.GenerateKey(rand.Reader, 3072)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("rsa-4096", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := rsa.GenerateKey(rand.Reader, 4096)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("ecdsa-P256", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 16 {
+			t.Errorf("unexpected symBlockSize %d; expected 16", symBlockSize)
+		}
+	})
+
+	t.Run("ecdsa-P384", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("ecdsa-P521", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
 }
