@@ -15,4 +15,5 @@ require (
 	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e // indirect
 )
 
+// required until https://github.com/google/go-tpm/pull/420 is merged
 replace github.com/google/go-tpm => github.com/hslatman/go-tpm v0.0.0-20251217214657-7d0adf0a5e3b
