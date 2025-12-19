@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"syscall"
@@ -816,6 +817,9 @@ func (h *winPCP) ActivateCredential(hKey uintptr, activationBlob []byte) ([]byte
 		return nil, err
 	}
 
+	hexBlob := hex.EncodeToString(activationBlob)
+	fmt.Println("activation blob", hexBlob)
+
 	r, _, msg := nCryptSetProperty.Call(hKey, uintptr(unsafe.Pointer(&utf16ActivationStr[0])), uintptr(unsafe.Pointer(&activationBlob[0])), uintptr(len(activationBlob)), 0)
 	if r != 0 {
 		if tpmErr := maybeWinErr(r); tpmErr != nil {
@@ -828,10 +832,14 @@ func (h *winPCP) ActivateCredential(hKey uintptr, activationBlob []byte) ([]byte
 	var size uint32
 	r, _, msg = nCryptGetProperty.Call(hKey, uintptr(unsafe.Pointer(&utf16ActivationStr[0])), uintptr(unsafe.Pointer(&secretBuff[0])), uintptr(len(secretBuff)), uintptr(unsafe.Pointer(&size)), 0)
 	if r != 0 {
+		fmt.Println("secret size", size)
+		hexSecret := hex.EncodeToString(secretBuff)
+		fmt.Println("secret blob", hexSecret)
+
 		if tpmErr := maybeWinErr(r); tpmErr != nil {
 			msg = tpmErr
 		}
-		return nil, fmt.Errorf("NCryptGetProperty returned %X (%v) for key activation", r, msg)
+		return nil, fmt.Errorf("NCryptGetProperty returned %X (%v) for key activation; activation blob: %s; secret size: %d; secret blob: %s", r, msg, hexBlob, size, hexSecret)
 	}
 	return secretBuff[:size], nil
 }
