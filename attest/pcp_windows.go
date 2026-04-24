@@ -225,9 +225,11 @@ var (
 		0x8029040B: "TPM_E_PCP_PROFILE_NOT_FOUND",
 		0x8029040C: "TPM_E_PCP_VALIDATION_FAILED",
 		0x80090009: "NTE_BAD_FLAGS",
+		0x80090016: "NTE_BAD_KEYSET",
 		0x80090026: "NTE_INVALID_HANDLE",
 		0x80090027: "NTE_INVALID_PARAMETER",
 		0x80090029: "NTE_NOT_SUPPORTED",
+		0x80092004: "CRYPT_E_NOT_FOUND",
 	}
 )
 
@@ -818,7 +820,10 @@ func (h *winPCP) LoadKeyByName(name string) (uintptr, error) {
 	var hKey uintptr
 	r, _, msg := nCryptOpenKey.Call(h.hProv, uintptr(unsafe.Pointer(&hKey)), uintptr(unsafe.Pointer(&utf16Name[0])), 0, uintptr(flags))
 	if r != 0 {
-		return 0, msg
+		if tpmErr := maybeWinErr(r); tpmErr != nil {
+			return 0, tpmErr
+		}
+		return 0, fmt.Errorf("NCryptOpenKey returned HRESULT 0x%X: %v", r, msg)
 	}
 	return hKey, nil
 }
