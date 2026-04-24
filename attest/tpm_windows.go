@@ -54,7 +54,7 @@ func probeSystemTPMs() ([]probedTPM, error) {
 	// Windows systems appear to only support a single abstracted TPM.
 	// If we fail to initialize the Platform Crypto Provider, we assume
 	// a TPM is not present.
-	pcp, err := openPCP()
+	pcp, err := openPCP(false)
 	if err != nil {
 		return nil, nil
 	}
@@ -85,8 +85,8 @@ func tbsConvertVersion(info tbsDeviceInfo) (TPMVersion, error) {
 	}
 }
 
-func openTPM(tpm probedTPM) (*TPM, error) {
-	pcp, err := openPCP()
+func openTPM(tpm probedTPM, config *OpenConfig) (*TPM, error) {
+	pcp, err := openPCP(config.MachineKey)
 	if err != nil {
 		return nil, fmt.Errorf("openPCP() failed: %v", err)
 	}
