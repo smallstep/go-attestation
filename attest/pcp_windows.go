@@ -21,6 +21,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"syscall"
@@ -34,10 +35,14 @@ import (
 const (
 	pcpProviderName = "Microsoft Platform Crypto Provider"
 	cryptENotFound  = 0x80092004 // From winerror.h.
+	nteExists       = 0x8009000F // NTE_EXISTS: The object already exists.
 
 	// The below is documented in this Microsoft whitepaper:
 	// https://github.com/Microsoft/TSS.MSR/blob/master/PCPTool.v11/Using%20the%20Windows%208%20Platform%20Crypto%20Provider%20and%20Associated%20TPM%20Functionality.pdf
 	ncryptOverwriteKeyFlag = 0x80
+	// ncryptMachineKeyFlag instructs NCrypt to create or open a key in the
+	// machine (local machine) key store rather than the current user key store.
+	ncryptMachineKeyFlag uint32 = 0x00000020
 	// Key usage value for generic keys
 	nCryptPropertyPCPKeyUsagePolicyGeneric = 0x3
 	// Key usage value for AKs.
@@ -71,6 +76,10 @@ var (
 	tbs              *windows.DLL
 	tbsGetDeviceInfo *windows.Proc
 )
+
+// errNCryptKeyExists is returned by newKey when NCryptCreatePersistedKey
+// returns NTE_EXISTS (0x8009000F), meaning a key with that name already exists.
+var errNCryptKeyExists = fmt.Errorf("NCrypt persisted key already exists")
 
 // Error codes.
 var (
@@ -222,9 +231,11 @@ var (
 		0x8029040B: "TPM_E_PCP_PROFILE_NOT_FOUND",
 		0x8029040C: "TPM_E_PCP_VALIDATION_FAILED",
 		0x80090009: "NTE_BAD_FLAGS",
+		0x80090016: "NTE_BAD_KEYSET",
 		0x80090026: "NTE_INVALID_HANDLE",
 		0x80090027: "NTE_INVALID_PARAMETER",
 		0x80090029: "NTE_NOT_SUPPORTED",
+		0x80092004: "CRYPT_E_NOT_FOUND",
 	}
 )
 
@@ -285,7 +296,8 @@ func getNCryptBufferProperty(hnd uintptr, field string) ([]byte, error) {
 
 // winPCP represents a reference to the Platform Crypto Provider.
 type winPCP struct {
-	hProv uintptr
+	hProv      uintptr
+	machineKey bool
 }
 
 // tbsDeviceInfo represents TPM device information from the TBS
@@ -473,9 +485,17 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 		return 0, nil, nil, err
 	}
 
+	var flags uint32
+	if h.machineKey {
+		flags = ncryptMachineKeyFlag
+	}
+
 	// Create a persistent RSA key of the specified name.
-	r, _, msg := nCryptCreatePersistedKey.Call(h.hProv, uintptr(unsafe.Pointer(&kh)), uintptr(unsafe.Pointer(&utf16RSA[0])), uintptr(unsafe.Pointer(&utf16Name[0])), 0, 0)
+	r, _, msg := nCryptCreatePersistedKey.Call(h.hProv, uintptr(unsafe.Pointer(&kh)), uintptr(unsafe.Pointer(&utf16RSA[0])), uintptr(unsafe.Pointer(&utf16Name[0])), 0, uintptr(flags))
 	if r != 0 {
+		if r == nteExists {
+			return 0, nil, nil, fmt.Errorf("NCryptCreatePersistedKey returned %X: %w", r, errNCryptKeyExists)
+		}
 		if tpmErr := maybeWinErr(r); tpmErr != nil {
 			msg = tpmErr
 		}
@@ -555,6 +575,13 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 func (h *winPCP) NewAK(name string) (uintptr, error) {
 	// AKs need to be RSA due to platform limitations
 	key, _, _, err := h.newKey(name, "RSA", 2048, nCryptPropertyPCPKeyUsagePolicyIdentity)
+	if errors.Is(err, errNCryptKeyExists) {
+		// A key with this name already exists in the NCrypt store (e.g. a
+		// previous agent run created it but the file-store was not persisted,
+		// or a reset failed to delete it from the machine key store). Open the
+		// existing key so the caller can continue rather than failing hard.
+		return h.LoadKeyByName(name)
+	}
 	return key, err
 }
 
@@ -801,10 +828,18 @@ func (h *winPCP) LoadKeyByName(name string) (uintptr, error) {
 		return 0, err
 	}
 
+	var flags uint32
+	if h.machineKey {
+		flags = ncryptMachineKeyFlag
+	}
+
 	var hKey uintptr
-	r, _, msg := nCryptOpenKey.Call(h.hProv, uintptr(unsafe.Pointer(&hKey)), uintptr(unsafe.Pointer(&utf16Name[0])), 0, 0)
+	r, _, msg := nCryptOpenKey.Call(h.hProv, uintptr(unsafe.Pointer(&hKey)), uintptr(unsafe.Pointer(&utf16Name[0])), 0, uintptr(flags))
 	if r != 0 {
-		return 0, msg
+		if tpmErr := maybeWinErr(r); tpmErr != nil {
+			return 0, tpmErr
+		}
+		return 0, fmt.Errorf("NCryptOpenKey returned HRESULT 0x%X: %v", r, msg)
 	}
 	return hKey, nil
 }
@@ -838,7 +873,9 @@ func (h *winPCP) ActivateCredential(hKey uintptr, activationBlob []byte) ([]byte
 
 // openPCP initializes a reference to the Microsoft PCP provider.
 // The Caller is expected to call Close() when they are done.
-func openPCP() (*winPCP, error) {
+// Pass machineKey=true to create and open keys in the machine (local machine)
+// key store rather than the current user key store.
+func openPCP(machineKey bool) (*winPCP, error) {
 	var err error
 	var h winPCP
 	pname, err := windows.UTF16FromString(pcpProviderName)
@@ -853,5 +890,6 @@ func openPCP() (*winPCP, error) {
 		}
 		return nil, err
 	}
+	h.machineKey = machineKey
 	return &h, nil
 }
