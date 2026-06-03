@@ -579,10 +579,6 @@ func (h *winPCP) NewAK(name string) (uintptr, error) {
 	// AKs need to be RSA due to platform limitations
 	key, _, _, err := h.newKey(name, "RSA", 2048, nCryptPropertyPCPKeyUsagePolicyIdentity)
 	if errors.Is(err, ErrKeyExists) {
-		// A key with this name already exists in the NCrypt store (e.g. a
-		// previous agent run created it but the file-store was not persisted,
-		// or a reset failed to delete it from the machine key store). Open the
-		// existing key so the caller can continue rather than failing hard.
 		return h.LoadKeyByName(name)
 	}
 	return key, err
