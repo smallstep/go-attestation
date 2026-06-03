@@ -84,7 +84,7 @@ func (cc *linuxCmdChannel) MeasurementLog() ([]byte, error) {
 	return os.ReadFile("/sys/kernel/security/tpm0/binary_bios_measurements")
 }
 
-func openTPM(tpm probedTPM) (*TPM, error) {
+func openTPM(tpm probedTPM, _ *OpenConfig) (*TPM, error) {
 	switch tpm.Version {
 	case TPMVersion12:
 		if getTPM12Impl == nil {

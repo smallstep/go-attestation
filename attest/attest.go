@@ -68,6 +68,19 @@ type OpenConfig struct {
 	// CommandChannel provides a TPM 2.0 command channel, which can be
 	// used in-lieu of any TPM present on the platform.
 	CommandChannel CommandChannelTPM20
+
+	// MachineKey indicates that keys should be created and opened in the
+	// machine (local machine) key store rather than the current user's key
+	// store. On Windows this causes NCRYPT_MACHINE_KEY_FLAG to be passed to
+	// NCrypt key operations. This field has no effect on non-Windows platforms.
+	//
+	// The scope applies to the entire TPM returned by OpenTPM: every key
+	// created or loaded through that TPM uses this setting. It is not a
+	// per-key option. To operate on keys in both the machine and user stores,
+	// open a separate TPM for each scope. Callers that manage per-key scope
+	// (e.g. go.step.sm/crypto) typically open a short-lived TPM per operation
+	// with the appropriate MachineKey value.
+	MachineKey bool
 }
 
 // keyEncoding indicates how an exported TPM key is represented.
@@ -514,7 +527,7 @@ func OpenTPM(config *OpenConfig) (*TPM, error) {
 
 	for _, tpm := range candidateTPMs {
 		if tpm.MatchesConfig(*config) {
-			return openTPM(tpm)
+			return openTPM(tpm, config)
 		}
 	}
 
@@ -537,7 +550,7 @@ func AvailableTPMs(config *OpenConfig) ([]TPMInfo, error) {
 
 	for _, tpm := range candidateTPMs {
 		if tpm.MatchesConfig(*config) {
-			t, err := openTPM(tpm)
+			t, err := openTPM(tpm, config)
 			if err != nil {
 				return nil, err
 			}
