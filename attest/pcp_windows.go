@@ -497,7 +497,7 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 	r, _, msg := nCryptCreatePersistedKey.Call(h.hProv, uintptr(unsafe.Pointer(&kh)), uintptr(unsafe.Pointer(&utf16RSA[0])), uintptr(unsafe.Pointer(&utf16Name[0])), 0, uintptr(flags))
 	if r != 0 {
 		if r == nteExists {
-			return 0, nil, nil, fmt.Errorf("NCryptCreatePersistedKey returned %X: %w", r, ErrKeyExists)
+			return 0, nil, nil, fmt.Errorf("NCryptCreatePersistedKey returned 0x%X: %w", r, ErrKeyExists)
 		}
 		if tpmErr := maybeWinErr(r); tpmErr != nil {
 			msg = tpmErr
