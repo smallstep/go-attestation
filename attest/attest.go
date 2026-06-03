@@ -70,9 +70,16 @@ type OpenConfig struct {
 	CommandChannel CommandChannelTPM20
 
 	// MachineKey indicates that keys should be created and opened in the
-	// machine context rather than the current user context. On Windows this
-	// causes NCRYPT_MACHINE_KEY_FLAG to be passed to NCrypt key operations.
-	// This field has no effect on non-Windows platforms.
+	// machine (local machine) key store rather than the current user's key
+	// store. On Windows this causes NCRYPT_MACHINE_KEY_FLAG to be passed to
+	// NCrypt key operations. This field has no effect on non-Windows platforms.
+	//
+	// The scope applies to the entire TPM returned by OpenTPM: every key
+	// created or loaded through that TPM uses this setting. It is not a
+	// per-key option. To operate on keys in both the machine and user stores,
+	// open a separate TPM for each scope. Callers that manage per-key scope
+	// (e.g. go.step.sm/crypto) typically open a short-lived TPM per operation
+	// with the appropriate MachineKey value.
 	MachineKey bool
 }
 

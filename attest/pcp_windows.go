@@ -77,9 +77,12 @@ var (
 	tbsGetDeviceInfo *windows.Proc
 )
 
-// errNCryptKeyExists is returned by newKey when NCryptCreatePersistedKey
-// returns NTE_EXISTS (0x8009000F), meaning a key with that name already exists.
-var errNCryptKeyExists = fmt.Errorf("NCrypt persisted key already exists")
+// ErrKeyExists is wrapped by newKey when NCryptCreatePersistedKey returns
+// NTE_EXISTS (0x8009000F), meaning a persisted key with that name already
+// exists in the targeted (user or machine) NCrypt key store. It is exported so
+// callers can detect this condition with errors.Is and decide how to handle it
+// (e.g. open the existing key, or surface an "already exists" error).
+var ErrKeyExists = errors.New("NCrypt persisted key already exists")
 
 // Error codes.
 var (
@@ -494,7 +497,7 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 	r, _, msg := nCryptCreatePersistedKey.Call(h.hProv, uintptr(unsafe.Pointer(&kh)), uintptr(unsafe.Pointer(&utf16RSA[0])), uintptr(unsafe.Pointer(&utf16Name[0])), 0, uintptr(flags))
 	if r != 0 {
 		if r == nteExists {
-			return 0, nil, nil, fmt.Errorf("NCryptCreatePersistedKey returned %X: %w", r, errNCryptKeyExists)
+			return 0, nil, nil, fmt.Errorf("NCryptCreatePersistedKey returned %X: %w", r, ErrKeyExists)
 		}
 		if tpmErr := maybeWinErr(r); tpmErr != nil {
 			msg = tpmErr
@@ -575,7 +578,7 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 func (h *winPCP) NewAK(name string) (uintptr, error) {
 	// AKs need to be RSA due to platform limitations
 	key, _, _, err := h.newKey(name, "RSA", 2048, nCryptPropertyPCPKeyUsagePolicyIdentity)
-	if errors.Is(err, errNCryptKeyExists) {
+	if errors.Is(err, ErrKeyExists) {
 		// A key with this name already exists in the NCrypt store (e.g. a
 		// previous agent run created it but the file-store was not persisted,
 		// or a reset failed to delete it from the machine key store). Open the
