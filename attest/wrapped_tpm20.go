@@ -554,6 +554,10 @@ func (k *wrappedKey20) certificationParameters() CertificationParameters {
 	}
 }
 
+func (k *wrappedKey20) handle() any {
+	return k.hnd
+}
+
 func (k *wrappedKey20) sign(tb tpmBase, digest []byte, pub crypto.PublicKey, opts crypto.SignerOpts) ([]byte, error) {
 	t, ok := tb.(*wrappedTPM20)
 	if !ok {

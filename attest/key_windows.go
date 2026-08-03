@@ -248,6 +248,10 @@ func (k *windowsAK20) certificationParameters() CertificationParameters {
 	}
 }
 
+func (k *windowsAK20) handle() any {
+	return k.hnd
+}
+
 func (k *windowsAK20) decrypt(tpmBase, []byte) ([]byte, error) {
 	return nil, errors.New("not implemented")
 }
