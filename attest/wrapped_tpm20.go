@@ -546,6 +546,10 @@ func (k *wrappedKey20) attestationParameters() AttestationParameters {
 	}
 }
 
+func (k *wrappedKey20) handle() any {
+	return k.hnd
+}
+
 func (k *wrappedKey20) certificationParameters() CertificationParameters {
 	return CertificationParameters{
 		Public:            k.public,

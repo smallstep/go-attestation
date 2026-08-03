@@ -37,6 +37,12 @@ func newTrousersKey12(blob, public []byte) ak {
 	}
 }
 
+// handle returns nil: TPM 1.2 has no TPM2_Certify, so this key cannot be
+// re-certified.
+func (k *trousersKey12) handle() any {
+	return nil
+}
+
 // Marshal represents the key in a persistent format which may be
 // loaded at a later time using tpm.LoadKey().
 func (k *trousersKey12) marshal() ([]byte, error) {

@@ -43,6 +43,12 @@ func newWindowsAK12(hnd uintptr, pcpKeyName string, public []byte) ak {
 	}
 }
 
+// handle returns nil: TPM 1.2 has no TPM2_Certify, so this key cannot be
+// re-certified.
+func (k *windowsAK12) handle() any {
+	return nil
+}
+
 func (k *windowsAK12) marshal() ([]byte, error) {
 	out := serializedKey{
 		Encoding:   keyEncodingOSManaged,
@@ -238,6 +244,12 @@ func (k *windowsAK20) blobs() ([]byte, []byte, error) {
 	// TODO(hslatman): check if this is required on Windows? `newKey` seems to create
 	// persistent keys with a name, so it may be possible to load the key by name instead?
 	return nil, nil, errors.New("not implemented")
+}
+
+// handle returns the NCrypt key handle. certify converts it to a transient
+// TPM handle via winPCP.TPMKeyHandle, so it is returned in NCrypt form here.
+func (k *windowsAK20) handle() any {
+	return k.hnd
 }
 
 func (k *windowsAK20) certificationParameters() CertificationParameters {
