@@ -183,6 +183,18 @@ func (k *AK) Certify(tpm *TPM, handle interface{}) (*CertificationParameters, er
 	return k.ak.certify(tpm.tpm, handle, nil)
 }
 
+// Recertify is [AK.Certify] with a caller-supplied nonce, binding the config's
+// QualifyingData into the certification. It accepts the same handle types
+// Certify does.
+//
+// Callers holding a [Key] rather than a raw handle should use [Key.Recertify].
+func (k *AK) Recertify(tpm *TPM, handle interface{}, config *RecertifyConfig) (*CertificationParameters, error) {
+	if config == nil {
+		config = &RecertifyConfig{}
+	}
+	return k.ak.certify(tpm.tpm, handle, config.QualifyingData)
+}
+
 // Blobs returns public and private blobs to be used by tpm2.Load().
 func (k *AK) Blobs() (pub, priv []byte, err error) {
 	return k.ak.blobs()
