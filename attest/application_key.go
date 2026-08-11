@@ -30,9 +30,6 @@ type key interface {
 	sign(tpmBase, []byte, crypto.PublicKey, crypto.SignerOpts) ([]byte, error)
 	decrypt(tpmBase, []byte) ([]byte, error)
 	blobs() ([]byte, []byte, error)
-	// handle returns the platform-specific handle for the loaded key, in
-	// whatever form that platform's certify expects (a tpmutil.Handle when
-	// talking to the TPM directly, an NCrypt handle on Windows).
 	handle() any
 }
 
@@ -129,38 +126,37 @@ func (k *Key) Marshal() ([]byte, error) {
 }
 
 // CertificationParameters returns information about the key required to
-// verify key certification.
-//
-// The parameters are those recorded when the key was created: the
-// TPM2_Certify performed at creation time, with the QualifyingData supplied
-// in that key's [KeyConfig] frozen in as the nonce. Use [Key.Recertify] to
-// produce a statement over a different nonce.
+// verify key certification. The parameters are those recorded when the key was
+// created; use [Key.Recertify] for a statement over a different nonce.
 func (k *Key) CertificationParameters() CertificationParameters {
 	return k.key.certificationParameters()
 }
 
-// Recertify runs a fresh TPM2_Certify over this key using ak, binding
-// qualifyingData as the freshness nonce, and returns the resulting parameters.
-//
-// It is the same operation key creation performs — [TPM.NewKey] certifies the
-// key it just created with the AK and the config's QualifyingData — separated
-// from creation so a persisted key can be certified again later against a new
-// nonce. That matters for protocols that bind a per-transaction challenge into
-// the certification, such as ACME device-attest-01: without this, proving
-// possession against a new challenge requires a new key, and any identity
-// registered against the old public key goes stale.
+// RecertifyConfig encapsulates parameters for re-certifying keys.
+type RecertifyConfig struct {
+	// QualifyingData is data provided from outside to the TPM when an attestation
+	// operation is performed. The TPM doesn't interpret the data, but does sign over
+	// it. It can be used as a nonce to ensure freshness of an attestation.
+	QualifyingData []byte
+}
+
+// Recertify certifies this key with ak again, over the nonce in config. The key
+// itself is untouched; only a new signed statement about it is produced.
 //
 // The key and ak must belong to the same TPM. Returns an error for TPM 1.2
 // keys, which have no TPM2_Certify.
-func (k *Key) Recertify(ak *AK, qualifyingData []byte) (*CertificationParameters, error) {
+func (k *Key) Recertify(ak *AK, config *RecertifyConfig) (*CertificationParameters, error) {
 	if ak == nil {
 		return nil, errors.New("ak cannot be nil")
+	}
+	if config == nil {
+		config = &RecertifyConfig{}
 	}
 	hnd := k.key.handle()
 	if hnd == nil {
 		return nil, errors.New("key does not support re-certification")
 	}
-	return ak.ak.certify(k.tpm, hnd, qualifyingData)
+	return ak.ak.certify(k.tpm, hnd, config.QualifyingData)
 }
 
 // Blobs returns public and private blobs to be used by tpm2.Load().
