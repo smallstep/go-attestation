@@ -55,10 +55,6 @@ jobs:
       # See https://github.com/google/go-tpm-tools#macos-dev
     - name: Install openssl
       run: brew install openssl@3
-    - name: Link openssl
-      run: |
-        sudo mkdir -p /usr/local/include
-        sudo ln -sfn "$(brew --prefix openssl@3)/include/openssl" /usr/local/include/openssl
     - name: Test
       run: C_INCLUDE_PATH="$(brew --prefix openssl@3)/include" LIBRARY_PATH="$(brew --prefix openssl@3)/lib" go test ./...
   test-windows:
