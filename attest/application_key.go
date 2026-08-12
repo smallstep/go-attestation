@@ -18,7 +18,6 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/rsa"
-	"errors"
 	"fmt"
 	"io"
 )
@@ -127,7 +126,7 @@ func (k *Key) Marshal() ([]byte, error) {
 
 // CertificationParameters returns information about the key required to
 // verify key certification. The parameters are those recorded when the key was
-// created; use [Key.Recertify] for a statement over a different nonce.
+// created; use [AK.Recertify] for a statement over a different nonce.
 func (k *Key) CertificationParameters() CertificationParameters {
 	return k.key.certificationParameters()
 }
@@ -138,25 +137,6 @@ type RecertifyConfig struct {
 	// operation is performed. The TPM doesn't interpret the data, but does sign over
 	// it. It can be used as a nonce to ensure freshness of an attestation.
 	QualifyingData []byte
-}
-
-// Recertify certifies this key with ak again, over the nonce in config. The key
-// itself is untouched; only a new signed statement about it is produced.
-//
-// The key and ak must belong to the same TPM. Returns an error for TPM 1.2
-// keys, which have no TPM2_Certify.
-func (k *Key) Recertify(ak *AK, config *RecertifyConfig) (*CertificationParameters, error) {
-	if ak == nil {
-		return nil, errors.New("ak cannot be nil")
-	}
-	if config == nil {
-		config = &RecertifyConfig{}
-	}
-	hnd := k.key.handle()
-	if hnd == nil {
-		return nil, errors.New("key does not support re-certification")
-	}
-	return ak.ak.certify(k.tpm, hnd, config.QualifyingData)
 }
 
 // Blobs returns public and private blobs to be used by tpm2.Load().

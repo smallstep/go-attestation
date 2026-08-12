@@ -184,11 +184,15 @@ func (k *AK) Certify(tpm *TPM, handle interface{}) (*CertificationParameters, er
 }
 
 // Recertify is [AK.Certify] with a caller-supplied nonce, binding the config's
-// QualifyingData into the certification. It accepts the same handle types
-// Certify does.
-//
-// Callers holding a [Key] rather than a raw handle should use [Key.Recertify].
-func (k *AK) Recertify(tpm *TPM, handle interface{}, config *RecertifyConfig) (*CertificationParameters, error) {
+// QualifyingData into the certification. handle accepts the same types Certify
+// does, or a [*Key], whose handle is used. Returns an error for TPM 1.2 keys,
+// which have no TPM2_Certify.
+func (k *AK) Recertify(tpm *TPM, handle any, config *RecertifyConfig) (*CertificationParameters, error) {
+	if key, ok := handle.(*Key); ok {
+		if handle = key.key.handle(); handle == nil {
+			return nil, errors.New("key does not support re-certification")
+		}
+	}
 	if config == nil {
 		config = &RecertifyConfig{}
 	}
