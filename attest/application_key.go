@@ -29,6 +29,7 @@ type key interface {
 	sign(tpmBase, []byte, crypto.PublicKey, crypto.SignerOpts) ([]byte, error)
 	decrypt(tpmBase, []byte) ([]byte, error)
 	blobs() ([]byte, []byte, error)
+	handle() any
 }
 
 // Key represents a key which can be used for signing and decrypting
@@ -124,9 +125,18 @@ func (k *Key) Marshal() ([]byte, error) {
 }
 
 // CertificationParameters returns information about the key required to
-// verify key certification.
+// verify key certification. The parameters are those recorded when the key was
+// created; use [AK.Recertify] for a statement over a different nonce.
 func (k *Key) CertificationParameters() CertificationParameters {
 	return k.key.certificationParameters()
+}
+
+// RecertifyConfig encapsulates parameters for re-certifying keys.
+type RecertifyConfig struct {
+	// QualifyingData is data provided from outside to the TPM when an attestation
+	// operation is performed. The TPM doesn't interpret the data, but does sign over
+	// it. It can be used as a nonce to ensure freshness of an attestation.
+	QualifyingData []byte
 }
 
 // Blobs returns public and private blobs to be used by tpm2.Load().
