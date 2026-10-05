@@ -314,3 +314,33 @@ func ecdsaKey(t *testing.T, curve elliptic.Curve) *ecdsa.PrivateKey {
 	}
 	return k
 }
+
+// TestActivationParametersGenerateFixedRand checks that generating a challenge
+// does not consume the caller's randomness beyond the activation secret.
+//
+// Callers supply a reader holding exactly the secret they want the challenge to
+// carry, which is how a verifier learns the secret without reading it back out
+// of the blob. Drawing the seed from the same reader leaves it exhausted and
+// fails with io.EOF.
+func TestActivationParametersGenerateFixedRand(t *testing.T) {
+	secret := make([]byte, activationSecretLen)
+	for i := range secret {
+		secret[i] = byte(i)
+	}
+
+	ekPriv := ekCertSigner(t)
+	params := ActivationParameters{
+		TPMVersion: TPMVersion20,
+		AK:         realWorldAKParams(t),
+		EK:         &ekPriv.PublicKey,
+		Rand:       bytes.NewReader(secret),
+	}
+
+	got, _, err := params.Generate()
+	if err != nil {
+		t.Fatalf("Generate() returned err: %v", err)
+	}
+	if !bytes.Equal(got, secret) {
+		t.Errorf("secret = %x, want %x", got, secret)
+	}
+}

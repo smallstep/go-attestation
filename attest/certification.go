@@ -284,7 +284,9 @@ func (p *CertificationParameters) Generate(rnd io.Reader, verifyOpts VerifyOpts,
 		return nil, nil, fmt.Errorf("attestation does not apply to certify data, got %x", att.Type)
 	}
 
-	cred, encSecret, err := generateCredentialActivation(activateOpts.VerifierKeyNameDigest, activateOpts.EK, nameAlgForEK(activateOpts.EK), symBlockSizeForEK(activateOpts.EK), secret, rnd)
+	// As in generateChallengeTPM20, the challenge is generated from crypto/rand
+	// rather than from rnd, which the caller may have sized for the secret alone.
+	cred, encSecret, err := generateCredentialActivation(activateOpts.VerifierKeyNameDigest, activateOpts.EK, nameAlgForEK(activateOpts.EK), symBlockSizeForEK(activateOpts.EK), secret, rand.Reader)
 	if err != nil {
 		return nil, nil, fmt.Errorf("generateCredentialActivation() failed: %v", err)
 	}

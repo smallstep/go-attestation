@@ -54,10 +54,13 @@ type ActivationParameters struct {
 	// Parameters() on an attest.AK.
 	AK AttestationParameters
 
-	// Rand is a source of randomness to generate a seed and secret for the
-	// challenge.
+	// Rand is the source of randomness for the activation secret, and, for a
+	// TPM 1.2, for the seed of the challenge that carries it. The challenge for
+	// a TPM 2.0 is always generated from crypto/rand, so a reader holding
+	// exactly the wanted secret is enough -- which is how a caller arranges to
+	// know the secret a challenge carries.
 	//
-	// If nil, this defaults to crypto.Rand.
+	// If nil, this defaults to crypto/rand.Reader.
 	Rand io.Reader
 }
 
@@ -219,7 +222,7 @@ func (p *ActivationParameters) Generate() (secret []byte, ec *EncryptedCredentia
 	case TPMVersion12:
 		ec, err = p.generateChallengeTPM12(rnd, secret)
 	case TPMVersion20:
-		ec, err = p.generateChallengeTPM20(rnd, secret)
+		ec, err = p.generateChallengeTPM20(secret)
 	default:
 		return nil, nil, fmt.Errorf("unrecognised TPM version: %v", p.TPMVersion)
 	}
@@ -230,7 +233,7 @@ func (p *ActivationParameters) Generate() (secret []byte, ec *EncryptedCredentia
 	return secret, ec, nil
 }
 
-func (p *ActivationParameters) generateChallengeTPM20(rand io.Reader, secret []byte) (*EncryptedCredential, error) {
+func (p *ActivationParameters) generateChallengeTPM20(secret []byte) (*EncryptedCredential, error) {
 	att, err := tpm2.DecodeAttestationData(p.AK.CreateAttestation)
 	if err != nil {
 		return nil, fmt.Errorf("DecodeAttestationData() failed: %v", err)
@@ -242,7 +245,10 @@ func (p *ActivationParameters) generateChallengeTPM20(rand io.Reader, secret []b
 		return nil, fmt.Errorf("attestation creation info name has no digest")
 	}
 
-	cred, encSecret, err := generateCredentialActivation(att.AttestedCreationInfo.Name.Digest, p.EK, nameAlgForEK(p.EK), symBlockSizeForEK(p.EK), secret, rand)
+	// The challenge is generated from crypto/rand, not from p.Rand: callers pass
+	// a reader holding just the activation secret, so consuming it here would
+	// leave nothing for the seed.
+	cred, encSecret, err := generateCredentialActivation(att.AttestedCreationInfo.Name.Digest, p.EK, nameAlgForEK(p.EK), symBlockSizeForEK(p.EK), secret, rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generateCredentialActivation() failed: %v", err)
 	}
