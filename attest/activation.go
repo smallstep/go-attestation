@@ -13,7 +13,6 @@ import (
 	tpm1 "github.com/google/go-tpm/tpm"
 
 	// TODO(jsonp): Move activation generation code to internal package.
-	"github.com/google/go-tpm/legacy/tpm2/credactivation"
 	"github.com/google/go-tspi/verification"
 )
 
@@ -23,6 +22,9 @@ const (
 	// activationSecretLen is the size in bytes of the generated secret
 	// which is generated for credential activation.
 	activationSecretLen = 32
+	// defaultNameAlg is the name algorithm of the EK templates that do not
+	// select a longer one.
+	defaultNameAlg = tpm2.AlgSHA256
 	// defaultSymBlockSize is the block size used for symmetric ciphers
 	// used when generating the credential activation challenge.
 	defaultSymBlockSize = 16
@@ -217,7 +219,7 @@ func (p *ActivationParameters) Generate() (secret []byte, ec *EncryptedCredentia
 	case TPMVersion12:
 		ec, err = p.generateChallengeTPM12(rnd, secret)
 	case TPMVersion20:
-		ec, err = p.generateChallengeTPM20(secret)
+		ec, err = p.generateChallengeTPM20(rnd, secret)
 	default:
 		return nil, nil, fmt.Errorf("unrecognised TPM version: %v", p.TPMVersion)
 	}
@@ -228,7 +230,7 @@ func (p *ActivationParameters) Generate() (secret []byte, ec *EncryptedCredentia
 	return secret, ec, nil
 }
 
-func (p *ActivationParameters) generateChallengeTPM20(secret []byte) (*EncryptedCredential, error) {
+func (p *ActivationParameters) generateChallengeTPM20(rand io.Reader, secret []byte) (*EncryptedCredential, error) {
 	att, err := tpm2.DecodeAttestationData(p.AK.CreateAttestation)
 	if err != nil {
 		return nil, fmt.Errorf("DecodeAttestationData() failed: %v", err)
@@ -240,9 +242,9 @@ func (p *ActivationParameters) generateChallengeTPM20(secret []byte) (*Encrypted
 		return nil, fmt.Errorf("attestation creation info name has no digest")
 	}
 
-	cred, encSecret, err := credactivation.Generate(att.AttestedCreationInfo.Name.Digest, p.EK, symBlockSizeForEK(p.EK), secret)
+	cred, encSecret, err := generateCredentialActivation(att.AttestedCreationInfo.Name.Digest, p.EK, nameAlgForEK(p.EK), symBlockSizeForEK(p.EK), secret, rand)
 	if err != nil {
-		return nil, fmt.Errorf("credactivation.Generate() failed: %v", err)
+		return nil, fmt.Errorf("generateCredentialActivation() failed: %v", err)
 	}
 
 	return &EncryptedCredential{

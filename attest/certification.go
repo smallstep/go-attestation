@@ -17,6 +17,7 @@ package attest
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -26,7 +27,6 @@ import (
 	"io"
 
 	"github.com/google/go-tpm/legacy/tpm2"
-	"github.com/google/go-tpm/legacy/tpm2/credactivation"
 	"github.com/google/go-tpm/tpmutil"
 )
 
@@ -193,6 +193,42 @@ func (p *CertificationParameters) Verify(opts VerifyOpts) error {
 	return nil
 }
 
+// nameAlgForEK returns the name algorithm of the EK template the given EK was
+// created from. The TPM protects a credential with the name algorithm of the
+// protecting key, so this is the algorithm a credential activation challenge has
+// to be built with.
+//
+// The key type determines the template, and the template fixes the name
+// algorithm: see TCG EK Credential Profile Version 2.6, December 4, 2024, B.4
+// (low range) and B.5/B.6 (high range). SHA-384 for RSA 3072, RSA 4096 and
+// P-384, SHA-512 for P-521, and SHA-256 for RSA 2048 and P-256. A TPM could
+// hold an EK from a template that pairs these differently, in which case the
+// activation has to be built from that template's name algorithm instead.
+func nameAlgForEK(ek crypto.PublicKey) tpm2.Algorithm {
+	switch pk := ek.(type) {
+	case *rsa.PublicKey:
+		if pk.Size() >= 384 { // RSA 3072, RSA 4096
+			return tpm2.AlgSHA384
+		}
+	case *ecdsa.PublicKey:
+		switch pk.Curve {
+		case elliptic.P384():
+			return tpm2.AlgSHA384
+		case elliptic.P521():
+			return tpm2.AlgSHA512
+		}
+	case *ecdh.PublicKey:
+		switch pk.Curve() {
+		case ecdh.P384():
+			return tpm2.AlgSHA384
+		case ecdh.P521():
+			return tpm2.AlgSHA512
+		}
+	}
+
+	return defaultNameAlg
+}
+
 func symBlockSizeForEK(ek crypto.PublicKey) int {
 	// see TCG EK Credential Profile Version 2.6, December 4, 2024, B.4.4 Storage EK Template
 	symBlockSize := defaultSymBlockSize // default to 16 bytes; 128 bits
@@ -203,6 +239,10 @@ func symBlockSizeForEK(ek crypto.PublicKey) int {
 		}
 	case *ecdsa.PublicKey:
 		if pk.Curve == elliptic.P384() || pk.Curve == elliptic.P521() {
+			symBlockSize = 32 // 32 bytes; 256 bits
+		}
+	case *ecdh.PublicKey:
+		if pk.Curve() == ecdh.P384() || pk.Curve() == ecdh.P521() {
 			symBlockSize = 32 // 32 bytes; 256 bits
 		}
 	}
@@ -244,9 +284,9 @@ func (p *CertificationParameters) Generate(rnd io.Reader, verifyOpts VerifyOpts,
 		return nil, nil, fmt.Errorf("attestation does not apply to certify data, got %x", att.Type)
 	}
 
-	cred, encSecret, err := credactivation.Generate(activateOpts.VerifierKeyNameDigest, activateOpts.EK, symBlockSizeForEK(activateOpts.EK), secret)
+	cred, encSecret, err := generateCredentialActivation(activateOpts.VerifierKeyNameDigest, activateOpts.EK, nameAlgForEK(activateOpts.EK), symBlockSizeForEK(activateOpts.EK), secret, rnd)
 	if err != nil {
-		return nil, nil, fmt.Errorf("credactivation.Generate() failed: %v", err)
+		return nil, nil, fmt.Errorf("generateCredentialActivation() failed: %v", err)
 	}
 
 	return secret, &EncryptedCredential{
