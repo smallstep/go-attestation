@@ -13,7 +13,6 @@ import (
 	tpm1 "github.com/google/go-tpm/tpm"
 
 	// TODO(jsonp): Move activation generation code to internal package.
-	"github.com/google/go-tpm/legacy/tpm2/credactivation"
 	"github.com/google/go-tspi/verification"
 )
 
@@ -23,9 +22,12 @@ const (
 	// activationSecretLen is the size in bytes of the generated secret
 	// which is generated for credential activation.
 	activationSecretLen = 32
-	// symBlockSize is the block size used for symmetric ciphers used
-	// when generating the credential activation challenge.
-	symBlockSize = 16
+	// defaultNameAlg is the name algorithm of the EK templates that do not
+	// select a longer one.
+	defaultNameAlg = tpm2.AlgSHA256
+	// defaultSymBlockSize is the block size used for symmetric ciphers
+	// used when generating the credential activation challenge.
+	defaultSymBlockSize = 16
 	// tpm20GeneratedMagic is a magic tag when can only be present on a
 	// TPM structure if the structure was generated wholly by the TPM.
 	tpm20GeneratedMagic = 0xff544347
@@ -52,10 +54,13 @@ type ActivationParameters struct {
 	// Parameters() on an attest.AK.
 	AK AttestationParameters
 
-	// Rand is a source of randomness to generate a seed and secret for the
-	// challenge.
+	// Rand is the source of randomness for the activation secret, and, for a
+	// TPM 1.2, for the seed of the challenge that carries it. The challenge for
+	// a TPM 2.0 is always generated from crypto/rand, so a reader holding
+	// exactly the wanted secret is enough -- which is how a caller arranges to
+	// know the secret a challenge carries.
 	//
-	// If nil, this defaults to crypto.Rand.
+	// If nil, this defaults to crypto/rand.Reader.
 	Rand io.Reader
 }
 
@@ -239,9 +244,13 @@ func (p *ActivationParameters) generateChallengeTPM20(secret []byte) (*Encrypted
 	if att.AttestedCreationInfo.Name.Digest == nil {
 		return nil, fmt.Errorf("attestation creation info name has no digest")
 	}
-	cred, encSecret, err := credactivation.Generate(att.AttestedCreationInfo.Name.Digest, p.EK, symBlockSize, secret)
+
+	// The challenge is generated from crypto/rand, not from p.Rand: callers pass
+	// a reader holding just the activation secret, so consuming it here would
+	// leave nothing for the seed.
+	cred, encSecret, err := generateCredentialActivation(att.AttestedCreationInfo.Name.Digest, p.EK, nameAlgForEK(p.EK), symBlockSizeForEK(p.EK), secret, rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("credactivation.Generate() failed: %v", err)
+		return nil, fmt.Errorf("generateCredentialActivation() failed: %v", err)
 	}
 
 	return &EncryptedCredential{
