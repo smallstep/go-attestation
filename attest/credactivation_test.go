@@ -19,6 +19,7 @@ import (
 	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/hmac"
@@ -343,4 +344,145 @@ func TestActivationParametersGenerateFixedRand(t *testing.T) {
 	if !bytes.Equal(got, secret) {
 		t.Errorf("secret = %x, want %x", got, secret)
 	}
+}
+
+// Test_nameAlgForEK covers the key type to name algorithm mapping of the TCG EK
+// templates. See TCG EK Credential Profile Version 2.6, December 4, 2024, B.4
+// and B.5/B.6.
+func Test_nameAlgForEK(t *testing.T) {
+	t.Parallel()
+
+	for _, test := range []struct {
+		name string
+		pub  func(t *testing.T) crypto.PublicKey
+		want tpm2.Algorithm
+	}{
+		{"rsa-2048", func(t *testing.T) crypto.PublicKey { return rsaKey(t, 2048).Public() }, tpm2.AlgSHA256},
+		{"rsa-3072", func(t *testing.T) crypto.PublicKey { return rsaKey(t, 3072).Public() }, tpm2.AlgSHA384},
+		{"rsa-4096", func(t *testing.T) crypto.PublicKey { return rsaKey(t, 4096).Public() }, tpm2.AlgSHA384},
+		{"ecdsa-P256", func(t *testing.T) crypto.PublicKey { return ecdsaKey(t, elliptic.P256()).Public() }, tpm2.AlgSHA256},
+		{"ecdsa-P384", func(t *testing.T) crypto.PublicKey { return ecdsaKey(t, elliptic.P384()).Public() }, tpm2.AlgSHA384},
+		{"ecdsa-P521", func(t *testing.T) crypto.PublicKey { return ecdsaKey(t, elliptic.P521()).Public() }, tpm2.AlgSHA512},
+		{"ecdh-P384", func(t *testing.T) crypto.PublicKey { return ecdhKey(t, ecdh.P384()).PublicKey() }, tpm2.AlgSHA384},
+		{"unknown", func(t *testing.T) crypto.PublicKey { return struct{}{} }, tpm2.AlgSHA256},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := nameAlgForEK(test.pub(t)); got != test.want {
+				t.Errorf("nameAlgForEK() = %v; expected %v", got, test.want)
+			}
+		})
+	}
+}
+
+func ecdhKey(t *testing.T, curve ecdh.Curve) *ecdh.PrivateKey {
+	t.Helper()
+	k, err := curve.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("GenerateKey(%v) returned err: %v", curve, err)
+	}
+	return k
+}
+
+func Test_symBlockSizeForEK(t *testing.T) {
+	t.Parallel()
+
+	t.Run("rsa-2048", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := rsa.GenerateKey(rand.Reader, 2048)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 16 {
+			t.Errorf("unexpected symBlockSize %d; expected 16", symBlockSize)
+		}
+	})
+
+	t.Run("rsa-3072", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := rsa.GenerateKey(rand.Reader, 3072)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("rsa-4096", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := rsa.GenerateKey(rand.Reader, 4096)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("ecdh-P384", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdh.P384().GenerateKey(rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.PublicKey())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("ecdsa-P256", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 16 {
+			t.Errorf("unexpected symBlockSize %d; expected 16", symBlockSize)
+		}
+	})
+
+	t.Run("ecdsa-P384", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
+
+	t.Run("ecdsa-P521", func(t *testing.T) {
+		t.Parallel()
+
+		k, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		symBlockSize := symBlockSizeForEK(k.Public())
+		if symBlockSize != 32 {
+			t.Errorf("unexpected symBlockSize %d; expected 32", symBlockSize)
+		}
+	})
 }
