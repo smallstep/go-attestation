@@ -165,12 +165,18 @@ func (t *windowsTPM) ekCertificates() ([]EK, error) {
 	return eks, nil
 }
 
+// useEKCerts is a temporary hack to ensure we always
+// get (only) the EK public key that corresponds to the
+// one reported by PCP as PCP_EKPUB.
+const useEKCerts = false
+
 func (t *windowsTPM) eks() ([]EK, error) {
 	ekCerts, err := t.pcp.EKCerts()
 	if err != nil {
 		return nil, fmt.Errorf("could not read EKCerts: %v", err)
 	}
-	if len(ekCerts) > 0 {
+
+	if useEKCerts && len(ekCerts) > 0 {
 		var eks []EK
 		for _, cert := range ekCerts {
 			eks = append(eks, EK{Certificate: cert, Public: cert.PublicKey})
