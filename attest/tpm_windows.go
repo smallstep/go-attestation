@@ -165,12 +165,22 @@ func (t *windowsTPM) ekCertificates() ([]EK, error) {
 	return eks, nil
 }
 
+// eks returns the TPM's endorsement keys. The first one is PCP_EKPUB, the EK
+// the Platform Crypto Provider activates credentials with, paired with its
+// certificate when the TPM has one (see providerEKFirst). If PCP_EKPUB can't
+// be read, the EK certificates are returned in the order the provider lists
+// them.
 func (t *windowsTPM) eks() ([]EK, error) {
 	ekCerts, err := t.pcp.EKCerts()
 	if err != nil {
 		return nil, fmt.Errorf("could not read EKCerts: %v", err)
 	}
-	if len(ekCerts) > 0 {
+
+	pub, err := t.ekPub()
+	if err != nil {
+		if len(ekCerts) == 0 {
+			return nil, fmt.Errorf("could not read ek public key from tpm: %v", err)
+		}
 		var eks []EK
 		for _, cert := range ekCerts {
 			eks = append(eks, EK{Certificate: cert, Public: cert.PublicKey})
@@ -178,20 +188,17 @@ func (t *windowsTPM) eks() ([]EK, error) {
 		return eks, nil
 	}
 
-	pub, err := t.ekPub()
-	if err != nil {
-		return nil, fmt.Errorf("could not read ek public key from tpm: %v", err)
+	eks, matched := providerEKFirst(pub, ekCerts)
+	if !matched {
+		i, err := t.info()
+		if err != nil {
+			return nil, err
+		}
+		if i.Manufacturer.String() == manufacturerIntel {
+			eks[0].CertificateURL = intelEKURL(pub)
+		}
 	}
-	ek := EK{Public: pub}
-
-	i, err := t.info()
-	if err != nil {
-		return nil, err
-	}
-	if i.Manufacturer.String() == manufacturerIntel {
-		ek.CertificateURL = intelEKURL(pub)
-	}
-	return []EK{ek}, nil
+	return eks, nil
 }
 
 func (t *windowsTPM) ekPub() (*rsa.PublicKey, error) {
