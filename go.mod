@@ -4,6 +4,8 @@ go 1.24.0
 
 toolchain go1.24.1
 
+retract [v0.4.4, v0.4.9] // unintentional releases tagged from surrogate branch
+
 require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-tpm v0.9.8
