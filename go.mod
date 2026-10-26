@@ -2,6 +2,8 @@ module github.com/smallstep/go-attestation
 
 go 1.20
 
+retract [v0.4.4, v0.4.9] // unintentional releases tagged from surrogate branch
+
 require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/go-tpm v0.9.0

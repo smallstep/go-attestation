@@ -13,6 +13,14 @@ Talks on this project:
 * _"Using TPMs to Cryptographically Verify Devices at Scale"_ - Open Source Summit North America - September 2019 - ([Video](https://www.youtube.com/watch?v=EmEymlA5Q5Q) 39min)
 * _"Making Remote Attestation Useful on Linux"_ - Linux Security Summit - September 2019 - ([Video](https://www.youtube.com/watch?v=TKva_h66Ptc) 26min)
 
+## Fork
+
+This is [Smallstep](https://smallstep.com)'s fork of
+[google/go-attestation](https://github.com/google/go-attestation), hosted at
+`github.com/smallstep/go-attestation`. Smallstep software uses the `surrogate`
+branch; relevant changes are intended to be upstreamed eventually. The fork does
+not publish tagged releases, so pin it by commit.
+
 ## Status
 
 Go-Attestation is under active development. Expect
