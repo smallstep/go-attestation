@@ -413,6 +413,53 @@ func (t *windowsTPM) newKey(ak *AK, config *KeyConfig) (*Key, error) {
 	return &Key{key: newWindowsKey20(hnd, name, pub, cp.CreateData, cp.CreateAttestation, cp.CreateSignature), pub: pubKey, tpm: t}, nil
 }
 
+// adoptKey opens the key persisted under config.Name and certifies it with
+// ak. Certification is TPM2_Certify over the open key, the same command
+// newKey runs on a key it has just created, so the result is the same as if
+// newKey had produced the key.
+func (t *windowsTPM) adoptKey(ak *AK, config *KeyConfig) (*Key, error) {
+	if t.version != TPMVersion20 {
+		return nil, fmt.Errorf("adopting keys on TPM version %v is unsupported", t.version)
+	}
+	k, ok := ak.ak.(*windowsAK20)
+	if !ok {
+		return nil, fmt.Errorf("expected *windowsAK20, got: %T", ak.ak)
+	}
+
+	hnd, err := t.pcp.LoadKeyByName(config.Name)
+	if err != nil {
+		return nil, fmt.Errorf("pcp failed to open key %q: %w", config.Name, err)
+	}
+	key, err := t.certifyAdoptedKey(k, hnd, config)
+	if err != nil {
+		closeNCryptObject(hnd)
+		return nil, err
+	}
+	return key, nil
+}
+
+func (t *windowsTPM) certifyAdoptedKey(k *windowsAK20, hnd uintptr, config *KeyConfig) (*Key, error) {
+	cp, err := k.certify(t, hnd, config.QualifyingData)
+	if err != nil {
+		return nil, fmt.Errorf("ak.Certify() failed: %v", err)
+	}
+
+	tpmPub, err := tpm2.DecodePublic(cp.Public)
+	if err != nil {
+		return nil, fmt.Errorf("decode public key: %v", err)
+	}
+	if err := checkAdoptable(tpmPub, config); err != nil {
+		return nil, fmt.Errorf("key %q cannot be adopted: %w", config.Name, err)
+	}
+
+	pubKey, err := tpmPub.Key()
+	if err != nil {
+		return nil, fmt.Errorf("access public key: %v", err)
+	}
+
+	return &Key{key: newWindowsKey20(hnd, config.Name, cp.Public, cp.CreateData, cp.CreateAttestation, cp.CreateSignature), pub: pubKey, tpm: t}, nil
+}
+
 func (t *windowsTPM) loadKey(opaqueBlob []byte) (*Key, error) {
 	if t.version != TPMVersion20 {
 		return nil, fmt.Errorf("loading keys on TPM version %v is unsupported", t.version)

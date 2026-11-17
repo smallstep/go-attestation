@@ -80,6 +80,12 @@ type KeyConfig struct {
 	// Name is used to specify a name for the key, instead of generating
 	// a random one. This property is only used on Windows.
 	Name string
+	// Overwrite replaces a key already persisted under Name rather than
+	// failing with ErrKeyExists (NCRYPT_OVERWRITE_KEY_FLAG). The replaced
+	// key is gone for good, along with every credential issued for it, so
+	// it is meant for a key known to be unusable, such as one the provider
+	// can no longer open. This property is only used on Windows.
+	Overwrite bool
 }
 
 // defaultConfig is used when no other configuration is specified.
