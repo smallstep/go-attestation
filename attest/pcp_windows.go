@@ -560,7 +560,7 @@ func getPCPCerts(hProv uintptr, propertyName string) ([][]byte, error) {
 	return out, nil
 }
 
-func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (uintptr, []byte, []byte, error) {
+func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32, overwrite bool) (uintptr, []byte, []byte, error) {
 	var kh uintptr
 	utf16Name, err := windows.UTF16FromString(name)
 	if err != nil {
@@ -574,6 +574,9 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 	var flags uint32
 	if h.machineKey {
 		flags = ncryptMachineKeyFlag
+	}
+	if overwrite {
+		flags |= ncryptOverwriteKeyFlag
 	}
 
 	// Create a persistent RSA key of the specified name.
@@ -660,7 +663,7 @@ func (h *winPCP) newKey(name string, alg string, length uint32, policy uint32) (
 // NewAK creates a persistent attestation key of the specified name.
 func (h *winPCP) NewAK(name string) (uintptr, error) {
 	// AKs need to be RSA due to platform limitations
-	key, _, _, err := h.newKey(name, "RSA", 2048, nCryptPropertyPCPKeyUsagePolicyIdentity)
+	key, _, _, err := h.newKey(name, "RSA", 2048, nCryptPropertyPCPKeyUsagePolicyIdentity, false)
 	if errors.Is(err, ErrKeyExists) {
 		return h.LoadKeyByName(name)
 	}
@@ -670,15 +673,15 @@ func (h *winPCP) NewAK(name string) (uintptr, error) {
 // NewKey creates a persistent application key of the specified name.
 func (h *winPCP) NewKey(name string, config *KeyConfig) (uintptr, []byte, []byte, error) {
 	if config.Algorithm == RSA {
-		return h.newKey(name, "RSA", uint32(config.Size), 0)
+		return h.newKey(name, "RSA", uint32(config.Size), 0, config.Overwrite)
 	} else if config.Algorithm == ECDSA {
 		switch config.Size {
 		case 256:
-			return h.newKey(name, "ECDSA_P256", 0, 0)
+			return h.newKey(name, "ECDSA_P256", 0, 0, config.Overwrite)
 		case 384:
-			return h.newKey(name, "ECDSA_P384", 0, 0)
+			return h.newKey(name, "ECDSA_P384", 0, 0, config.Overwrite)
 		case 521:
-			return h.newKey(name, "ECDSA_P521", 0, 0)
+			return h.newKey(name, "ECDSA_P521", 0, 0, config.Overwrite)
 		default:
 			return 0, nil, nil, fmt.Errorf("unsupported ECDSA key size: %v", config.Size)
 		}
